@@ -1,0 +1,25 @@
+#Configuration for the websocket bridge.
+websocketservicesbridge:
+  portNumber: 25564
+  #Logs to the console (0 = off, 1 = simple, 2 = verbose).
+  logging: 0
+  #Sets the maximum number of connections the server can handle concurrently.
+  maximumConnections: 32
+  #Sets the number of milliseconds that the server will wait for a handshake to complete.
+  handshakeTimeOutTolerance: 1000  
+  #Determines if the origin is valid during the handshake.  If the origin is null, it is invalid and the connection is rejected.
+  checkOrigin: true
+  #Determines if the websocket services are only available to certain ips.  Note that this checks the origin header field during the handshake and can be spoofed by non-browser clients.
+  whitelist: false
+  #Determines if the server is pingable via websockets (This is reserved as a future feature as most browers do not support a websocket ping method).
+  pingable: false
+  #Determines the state of the bridge.
+  state: passive
+#A list of websocketservers to bridge.
+websocketservers:
+  minecraft1:
+    address: localhost:25564
+    restricted: false
+  minecraft2:
+    address: localhost:25566
+    restricted: false

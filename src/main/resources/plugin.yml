@@ -1,0 +1,4 @@
+name: WebSocketServicesBridge
+main: com.caffeinatedrat.WebSocketServicesBridge.WebSocketServicesBridge
+author: ['CaffeinatedRat']
+version: 0.0.1
