@@ -24,8 +24,7 @@
 
 package com.caffeinatedrat.WebSocketServicesBridge;
 
-import com.caffeinatedrat.WebSocketServicesBridge.Server.ProxyServer;
-//import com.caffeinatedrat.WebSocketServicesBridge.Util.Logger;
+import com.caffeinatedrat.WebSocketServicesBridge.Server.Server;
 import com.caffeinatedrat.SimpleWebSockets.Util.Logger;
 
 import net.md_5.bungee.api.plugin.Plugin;
@@ -42,7 +41,7 @@ public class WebSocketServicesBridge extends Plugin {
     // Member Vars (fields)
     // ----------------------------------------------
     
-    private ProxyServer server = null;
+    private Server server = null;
     
     // ----------------------------------------------
     // Events
@@ -58,7 +57,7 @@ public class WebSocketServicesBridge extends Plugin {
         Logger.debugLevel = config.getDebugLevel();
         
         //Start-up the server with all the appropriate configuration values.
-        server = new ProxyServer(config.getPortNumber(), config.getConfiguredServers(), config.getIsWhiteListed(), config.getMaximumConnections());
+        server = new Server(config.getPortNumber(), config.getConfiguredServers(), config.getIsWhiteListed(), config.getMaximumConnections());
         server.setHandshakeTimeout(config.getHandshakeTimeOut());
         server.setOriginCheck(config.getCheckOrigin());
         server.setPingable(config.getIsPingable());

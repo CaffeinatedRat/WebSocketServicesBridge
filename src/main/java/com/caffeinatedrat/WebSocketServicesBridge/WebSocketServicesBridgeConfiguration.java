@@ -37,7 +37,7 @@ import net.craftminecraft.bungee.bungeeyaml.bukkitapi.file.YamlConfiguration;
 import net.md_5.bungee.api.plugin.Plugin;
 
 import com.caffeinatedrat.WebSocketServicesBridge.Exception.InvalidConfiguredServerInfoException;
-//import com.caffeinatedrat.WebSocketServicesBridge.Util.Logger;
+import com.caffeinatedrat.WebSocketServicesBridge.Server.ConfiguredServer;
 import com.caffeinatedrat.SimpleWebSockets.Util.Logger;
 
 public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {

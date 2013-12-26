@@ -24,286 +24,301 @@
 
 package com.caffeinatedrat.WebSocketServicesBridge.Server;
 
-import java.io.*;
-import java.net.*;
+import java.io.IOException;
+import java.net.Socket;
+import java.net.UnknownHostException;
 import java.text.MessageFormat;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
-import com.caffeinatedrat.SimpleWebSockets.Frame;
 import com.caffeinatedrat.SimpleWebSockets.Handshake;
 import com.caffeinatedrat.SimpleWebSockets.Exceptions.InvalidFrameException;
-import com.caffeinatedrat.SimpleWebSockets.Frame.OPCODE;
-import com.caffeinatedrat.WebSocketServicesBridge.ConfiguredServer;
-//import com.caffeinatedrat.WebSocketServicesBridge.Util.Logger;
+import com.caffeinatedrat.SimpleWebSockets.Frames.Frame;
 import com.caffeinatedrat.SimpleWebSockets.Util.Logger;
 
 /**
- * Handles a single websocket connection with the server.
+ * Handles a single threaded connection to a targeted server.
  *
  * @version 1.0.0.0
  * @author CaffeinatedRat
  */
-public class ProxyConnection extends Thread {
+public class ProxyConnection {
+
+    public enum StateInfo {
+        
+        UNINITIALIZED,
+        INITIALIZED,
+        CONNECTING,
+        CONNECTED,
+        CLOSED,
+        BADSTATE
+        
+    }
     
     // ----------------------------------------------
     // Member Vars (fields)
     // ----------------------------------------------
+    private ConfiguredServer configuredServer = null;
     
-    private Socket socket;
-    private ProxyServer server;
-    private String id;
+    private Socket socket = null;
+    private StateInfo state = StateInfo.UNINITIALIZED;
+    
+    //This member variable has two states due to the fact we are going to recycle it.
+    // 1) Before the connection to the server is opened, this holds the original handshake request from the client.
+    // 2) After the connection to the server is opened, this holds the handshake to the proxy connection (to the server endpoint).
+    private Handshake handshake = null;
     
     // ----------------------------------------------
     // Properties
     // ----------------------------------------------
     
-    /*
-     * Returns the simple proxy server.
+   
+    /**
+     * Returns true if the connection is closed.
+     * @return true if the connection is closed.
      */
-    public ProxyServer getServer() {
-        return this.server;
+    public boolean isClosed() {
+        
+        if (this.socket != null) {
+            return this.socket.isClosed();
+        }
+        else {
+            return true;
+        }
     }
+    
     
     // ----------------------------------------------
     // Constructors
     // ----------------------------------------------
     
-    public ProxyConnection(Socket socket, com.caffeinatedrat.WebSocketServicesBridge.Server.ProxyServer server) {
+    public ProxyConnection(ConfiguredServer configuredServer) {
         
-        if (server == null) {
-            throw new IllegalArgumentException("The proxyServer is invalid (null).");
+        if (configuredServer == null) {
+            throw new IllegalArgumentException("The configuredServer is invalid (null).");
         }
         
-        this.socket = socket;
-        this.server = server;
+        this.configuredServer = configuredServer;
+        this.state = StateInfo.INITIALIZED;
+        this.handshake = null;
         
     }
     
-    // ----------------------------------------------
-    // Methods
-    // ----------------------------------------------
-    
-    
     /**
-     * Begins managing an individual connection.
+     * Attempts to open a connection to the configured server.
+     * @return true if the connection was successful.
      */
-    @Override
-    public void run() {
+    public boolean open() {
         
-        Logger.verboseDebug(MessageFormat.format("A new thread {0} has spun up...", this.getName()));
-        Logger.debug(MessageFormat.format("Connection {0} established.", this.id));
+        //We are already connected or connecting, ignore this.
+        if (this.state == StateInfo.CONNECTED || this.state == StateInfo.CONNECTING) {
+            return true;
+        }
         
-        try {
+        if (this.state == StateInfo.INITIALIZED ) {
+        
+            String address = this.configuredServer.getAddress();
             
             try {
                 
-                Handshake handshake = new Handshake(this.socket, getServer().getHandshakeTimeout(), getServer().isOriginChecked(), getServer().getWhiteList());
+                //If a socket exists, see if we can reuse it if it is closed.
+                if (this.socket != null) {
                 
-                //Negotiate with the client (webbrowser)
-                if (handshake.negotiateRequest()) {
+                    if ( this.socket.isClosed() ) {
                     
-                    Logger.debug("Handshaking successful.");
-                    
-                    try {
-                        
-                        final Set<ConfiguredServer> configuredServers = this.server.getServers();
-                        
-                        //Begin the handshaking process for all our configured servers.
-                        //A configured server that fails a handshake will have its connection closed and will be ignored by the proxy.
-                        Iterator<ConfiguredServer> iterator = configuredServers.iterator();
-                        while (iterator.hasNext()) {
-                            
-                            final ConfiguredServer configuredServerInfo = iterator.next();
-                            if (configuredServerInfo.open()) {
-                                
-                                configuredServerInfo.handshake(handshake);
-                                
-                            }
-                        }
-                        //END OF while (iterator.hasNext()) {...
-
-                        //From the proxy back to the client (webbrowser)
-                        //final OutputStream proxyOut = this.socket.getOutputStream();
-                        
-                        //From the client (webbrowser) to the configured server.
-                        final InputStream clientIn = this.socket.getInputStream();
-                        
-                        // Define and create a thread to transmit bytes from client to server
-                        Thread c2s = new Thread() {
-                          public void run() {
-                          
-                              try {
-                              
-                                  final byte[] buffer = new byte[4048];
-                                  int bytes_read;
-                            
-                                  while((bytes_read = clientIn.read(buffer)) != -1) {
-    
-                                      Iterator<ConfiguredServer> iterator = configuredServers.iterator();
-                                      while (iterator.hasNext()) {
-                                          
-                                          final ConfiguredServer configuredServerInfo = iterator.next();
-                                          configuredServerInfo.write(buffer, bytes_read);
-                                          
-                                      }
-                                      //END OF while (iterator.hasNext()) {...
-    
-                                  }
-                              }
-                              catch(IOException exception) {
-                                  
-                              }
-                              
-                          }
-                        };
-                        
-                        
-                        c2s.start();
-                        
-                        /*
-                            
-                            /*
-                            // Define and create a thread to transmit bytes from client to server
-                            Thread c2s = new Thread() {
-                              public void run() {
-                              
-                                  try {
-                                      final Socket bukkitServer = new Socket(configuredServerInfo.getAddress(), configuredServerInfo.getPort());
-                                      final OutputStream to_out = bukkitServer.getOutputStream();
-                                      final InputStream to_in = bukkitServer.getInputStream();
-                                  
-                                      byte[] buffer = new byte[2048];
-                                      int bytes_read;
-                                
-                                      while((bytes_read = this_in.read(buffer)) != -1) {
-                                          to_out.write(buffer, 0, bytes_read);
-                                          to_out.flush();
-                                      }
-                                  
-                                      bukkitServer.close();
-                                  }
-                                  catch (IOException e) {}
-                              }
-                            };
-                            */
-                            
-                            //c2s.start();
-                    
+                        this.socket = new Socket(address, this.configuredServer.getPort());
                     }
-                    catch (Exception e) {
-                        
-                        Logger.severe("Blah");
-                        
-                    }
-                    //catch (IOException e) {}
-
-                    
-                    //Get the each server.
-                    //Map<String, ServerInfo> serverCollection = this.server.getBridge().getProxy().getServers();
-
-                    
-                    /*
-                    Iterator it = serverCollection.entrySet().iterator();
-                    while (it.hasNext()) {
-                        
-                        Map.Entry pairs = (Map.Entry)it.next();
-                        
-                        InetSocketAddress address = ((ServerInfo)pairs.getValue()).getAddress(); 
-                        
-                        try {
-
-                            Socket bukkitServer = new Socket(address.getHostName(), address.getPort());
-                            OutputStream out = bukkitServer.getOutputStream();
-                            InputStream in = this.socket.getInputStream();
-                            
-                            byte[] buffer = new byte[2048];
-                            int bytes_read;
-                            try {
-                              while((bytes_read = in.read(buffer)) != -1) {
-                                  out.write(buffer, 0, bytes_read);
-                                  out.flush();
-                              }
-                            }
-                            catch (IOException e) {}
-
-                            try { out.close(); } catch (IOException e) {}
-                            
-                        } catch (IOException e) {
-                            
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                            
-                        }
-                        
-                        it.remove(); // avoids a ConcurrentModificationException
-                        
-                    }
-                    */
-                    
                     
                 }
                 else {
                     
-                    Logger.debug("Handshaking failure.");
-                    writeCloseFrame("The handshaking has failed.");
-                }
-                //END OF if(handshake.processRequest())...
-            }
-            catch (InvalidFrameException invalidFrame) {
-                
-                Logger.debug("The frame is invalid.");
-                
-                try {
+                    this.socket = new Socket(address, this.configuredServer.getPort());
                     
-                    writeCloseFrame("The frame was invalid.");
-                }
-                catch(InvalidFrameException ife) {
-                    //Do nothing...
                 }
                 
+                Logger.verboseDebug(MessageFormat.format("A connection to the configured server {0} has been opened.", this.configuredServer.getServerName()));
+                this.state = StateInfo.CONNECTING;
+                return true;
             }
-
-            Logger.debug(MessageFormat.format("Connection {0} terminated.", this.id));
-            Logger.verboseDebug(MessageFormat.format("Thread {0} has spun down...", this.getName()));
-        }
-        finally {
-            close();
-        }        
-    }
+            catch (UnknownHostException e) {
     
-    /**
-     * Close the connection.
-     */
-    public void close() {
-        try {
-            if (this.socket != null) {
-                this.socket.close();
+                this.state = StateInfo.CLOSED;
+                Logger.info(MessageFormat.format("The host {0} is invalid or could not be resolved.", address));
+                Logger.verboseDebug(MessageFormat.format("Details: {0}", e.getMessage()));
+                
+            }
+            catch (IOException e) {
+                
+                this.state = StateInfo.CLOSED;
+                Logger.verboseDebug(MessageFormat.format("Unknown IOException.\r\n Details: {0}", e.getMessage()));
+                
             }
         }
-        catch(IOException io) {
-            //Do nothing...
-        }
-    }
-    
-    /**
-     * Close the connection.
-     * @param message The message to include in the close frame as to why the frame is closing.
-     * @throws InvalidFrameException occurs when the frame is invalid due to an incomplete frame being sent by the client.
-     */
-    private void writeCloseFrame(String message) throws InvalidFrameException {
-        
-        if (this.socket != null) {
-        
-            //RFC: http://tools.ietf.org/html/rfc6455#section-5.5.1
-            Frame closeFrame = new Frame(this.socket);
-            closeFrame.setFinalFragment();
-            closeFrame.setOpCode(OPCODE.CONNECTION_CLOSE_CONTROL_FRAME);
-            closeFrame.setPayload(message);
-            closeFrame.write();
+        else {
+            
+            Logger.verboseDebug(MessageFormat.format("The connection cannot be opened during this state {0}", this.state.toString()));
             
         }
         
-    }    
+        return false;
+    }
+    
+    /**
+     * Attempts to close a connection to the configured server.
+     */
+    public void close() {
+        
+        if (this.socket != null) {
+            
+            try {
+                
+                Logger.verboseDebug(MessageFormat.format("The connection to the configured server {0} has been closed.", this.configuredServer.getServerName()));
+                
+                this.state = StateInfo.CLOSED;
+                socket.close();
+                
+            } catch (IOException e) {
+                //Do nothing...
+            }
+            
+        }
+        
+    }
+    
+    /**
+     * Attempt to handshake with the configured server.
+     * @param handshakeRequest An already established handshake from the original client.
+     * @return true if the handshake was successful
+     */
+    public boolean performHandshake(Handshake handshakeRequest) {
+        
+        //We are already connected ignore this.
+        if (this.state == StateInfo.CONNECTED) {
+            return true;
+        }
+        
+        if (this.state == StateInfo.CONNECTING) {
+            
+            this.handshake = handshakeRequest.cloneHandshake(this.socket);
+            this.handshake.forwardRequest();
+            if(this.handshake.negotiateResponse()) {
+                
+                this.state = StateInfo.CONNECTED;
+                return true;
+                
+            }
+            else {
+                
+                Logger.verboseDebug("The handshake has failed.");
+                
+            }
+            
+        }
+        else {
+            
+            Logger.verboseDebug(MessageFormat.format("The handshake cannot be performed during this state {0}", this.state.toString()));
+            
+        }
+        
+        //Close the socket.
+        close();
+        return false;
+    }
+    
+    /**
+     * Attempt to write everything in the inputstream to the configured server.
+     * @param buffer The buffer to write to the configured server.
+     * @param size The size of the buffer to write to the configured server.
+     * @return true if the handshake was successful
+     */
+    /*
+    private void write(byte[] buffer, int size) {
+        
+        //We can only write if the connection is still opened.
+        if (this.state == StateInfo.CONNECTED) {
+        
+            try {
+                
+                OutputStream outputStream = this.socket.getOutputStream();
+                outputStream.write(buffer, 0, size);
+                outputStream.flush();
+            
+            }
+            catch (IOException e) {
+                
+                Logger.verboseDebug(MessageFormat.format("The write cannot be performed due to some unexpected exception: {0}", e.getMessage()));
+                close();
+                
+            }
+        }
+        else {
+            
+            Logger.verboseDebug(MessageFormat.format("The write cannot be performed during this state {0}", this.state.toString()));
+            
+        }
+    }
+    */
+    
+    /**
+     * Attempt to write a read frame to the configured server.
+     * @param frame The stream to write to the configured server.
+     * @return true if the handshake was successful
+     */    
+    public void write(Frame frame) throws InvalidFrameException {
+        
+        //For now, do nothing on null frames.
+        if (frame == null) {
+            return;
+        }
+        
+        //We can only write if the connection is still opened.
+        if (this.state == StateInfo.CONNECTED) {
+        
+            try {
+                
+                Frame responseFrame = new Frame(frame, this.socket);
+                Logger.verboseDebug(MessageFormat.format("INPUT: {0}", responseFrame.getPayloadAsString()));
+                responseFrame.write();
+            
+            } catch (InvalidFrameException e) {
+                 
+                Logger.verboseDebug(MessageFormat.format("An invalid frame was supplied: {0}", e.getMessage()));
+                close();
+                throw e;
+
+            }
+        }
+        else {
+            
+            Logger.verboseDebug(MessageFormat.format("The write cannot be performed during this state {0}", this.state.toString()));
+            
+        }
+    }
+    
+    public List<Frame> read() throws InvalidFrameException  {
+        
+        List<Frame> frames = new ArrayList<Frame>();
+        
+        try {
+            
+            ProxyFrameReader reader = new ProxyFrameReader(this.socket, 15000);
+            while(reader.read())
+            {
+                Frame frame = reader.getFrame();
+                frames.add(new Frame(frame));
+                
+                if (frame.getOpCode() == Frame.OPCODE.CONNECTION_CLOSE_CONTROL_FRAME) {
+                    break;
+                }
+            }
+            
+        } catch (InvalidFrameException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            throw e;
+        }
+
+        return frames;
+    }
     
 }

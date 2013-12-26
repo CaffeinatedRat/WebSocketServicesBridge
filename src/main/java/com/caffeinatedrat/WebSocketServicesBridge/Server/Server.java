@@ -31,18 +31,16 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Set;
 
-import com.caffeinatedrat.WebSocketServicesBridge.ConfiguredServer;
 import com.caffeinatedrat.WebSocketServicesBridge.Globals;
-//import com.caffeinatedrat.WebSocketServicesBridge.Util.Logger;
 import com.caffeinatedrat.SimpleWebSockets.Util.Logger;
 
 /**
- * The proxy server to many WebSocketServers.
+ * The actual WebSocketServicesBridge server.
  *
  * @version 1.0.0.0
  * @author CaffeinatedRat
  */
-public class ProxyServer extends Thread {
+public class Server extends Thread {
 
     // ----------------------------------------------
     // Member Vars (fields)
@@ -62,7 +60,7 @@ public class ProxyServer extends Thread {
     private Set<ConfiguredServer> configuredServers = null;
     
     //Keep track of all threads.
-    private LinkedList<ProxyConnection> threads = null;
+    private LinkedList<Connection> threads = null;
     
     // ----------------------------------------------
     // Properties
@@ -164,7 +162,7 @@ public class ProxyServer extends Thread {
     // Constructors
     // ----------------------------------------------
      
-    public ProxyServer(int port, Set<ConfiguredServer> configuredServers, boolean isWhiteListed, int maximumThreads) {
+    public Server(int port, Set<ConfiguredServer> configuredServers, boolean isWhiteListed, int maximumThreads) {
         
         if (configuredServers == null) {
             
@@ -173,7 +171,7 @@ public class ProxyServer extends Thread {
         }
         
         this.isServerRunning = true;
-        this.threads = new LinkedList<ProxyConnection>();
+        this.threads = new LinkedList<Connection>();
         
         //Properties
         this.port = port;
@@ -238,7 +236,7 @@ public class ProxyServer extends Thread {
                 //NOTE: Minimal unit testing has been done here...more testing is required.
                 if ( (threads.size() + 1) <= this.getMaximumThreads()) {
                     
-                    ProxyConnection t = new ProxyConnection(socket, this);
+                    Connection t = new Connection(socket, this);
                     t.start();
                     threads.add(t);
                     
@@ -265,7 +263,7 @@ public class ProxyServer extends Thread {
             
             //Close all threads.
             //TimeComplexity: O(n) -- Where n is the number of threads valid or invalid.
-            for (ProxyConnection t : threads) {
+            for (Connection t : threads) {
                 if (t.isAlive()) {
                     t.close();
                 }
