@@ -54,6 +54,7 @@ public class Server extends Thread {
     private int port;
     private int maximumThreads;
     private int handshakeTimeOutInMilliseconds;
+    private int maximumNumberOfSupportedFragmentedFrames = 20;
     private boolean checkOrigin;
     private boolean pingable;
     private HashSet<String> whitelist = null;
@@ -131,6 +132,22 @@ public class Server extends Thread {
     public void setPingable(boolean isPingable) {
         this.pingable = isPingable;
     }
+    
+    /**
+     * Returns the maximum number of supported fragmented frames for this server.
+     * @return the maximum number of supported fragmented frames for this server.
+     */    
+    public int getMaximumNumberOfSupportedFragmentedFrames() {
+        return this.maximumNumberOfSupportedFragmentedFrames;
+    }
+    
+    /**
+     * Sets the maximum number of supported fragmented frames for this server.
+     * @param maximumNumberOfSupportedFragmentedFrames the maximum number of supported fragmented frames for this server.
+     */    
+    public void setMaximumNumberOfSupportedFragmentedFrames(int maximumNumberOfSupportedFragmentedFrames) {
+        this.maximumNumberOfSupportedFragmentedFrames = maximumNumberOfSupportedFragmentedFrames;
+    }     
     
     /**
      * Determines if the websockets server is publicly available or by white-list only.

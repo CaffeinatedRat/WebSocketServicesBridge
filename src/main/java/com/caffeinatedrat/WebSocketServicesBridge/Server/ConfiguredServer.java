@@ -47,6 +47,7 @@ public class ConfiguredServer {
     private String serverName;
     private String hostAddress;
     private int port;
+    private int maximumNumberOfSupportedFragmentedFrames;
     
     // ----------------------------------------------
     // Properties
@@ -76,19 +77,28 @@ public class ConfiguredServer {
         return this.port;
     }
     
+    /**
+     * Returns the maximum number of supported fragmented frames for this server.
+     * @return the maximum number of supported fragmented frames for this server.
+     */    
+    public int getMaximumNumberOfSupportedFragmentedFrames() {
+        return this.maximumNumberOfSupportedFragmentedFrames;
+    }
+    
     // ----------------------------------------------
     // Constructors
     // ----------------------------------------------
     
-    public ConfiguredServer(String serverName, String hostAddress, int port) {
+    public ConfiguredServer(String serverName, String hostAddress, int port, int maximumNumberOfSupportedFragmentedFrames) {
         
         this.serverName = serverName;
         this.hostAddress = hostAddress;
         this.port = port;
-
+        this.maximumNumberOfSupportedFragmentedFrames = maximumNumberOfSupportedFragmentedFrames;
+        
     }
     
-    public ConfiguredServer(String serverName, String address) 
+    public ConfiguredServer(String serverName, String address, int maximumNumberOfSupportedFragmentedFrames) 
             throws InvalidConfiguredServerInfoException {
         
         this.serverName = serverName;
@@ -116,6 +126,12 @@ public class ConfiguredServer {
         
     }
     
+    public ConfiguredServer(String serverName, String address) 
+            throws InvalidConfiguredServerInfoException {
+        
+        this(serverName, address, 2);
+        
+    }
     
     // ----------------------------------------------
     // Methods
