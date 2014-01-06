@@ -124,6 +124,7 @@ public class ConfiguredServer {
             
         }
         
+        this.maximumNumberOfSupportedFragmentedFrames = maximumNumberOfSupportedFragmentedFrames;
     }
     
     public ConfiguredServer(String serverName, String address) 
