@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2012-2013, Ken Anderson <caffeinatedrat at gmail dot com>
+* Copyright (c) 2012-2014, Ken Anderson <caffeinatedrat at gmail dot com>
 * All rights reserved.
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are met:
@@ -28,12 +28,14 @@ import java.io.IOException;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 import com.caffeinatedrat.SimpleWebSockets.Handshake;
 import com.caffeinatedrat.SimpleWebSockets.Exceptions.InvalidFrameException;
 import com.caffeinatedrat.SimpleWebSockets.Frames.Frame;
+import com.caffeinatedrat.SimpleWebSockets.Frames.FullFrameReader;
 import com.caffeinatedrat.SimpleWebSockets.Util.Logger;
 
 /**
@@ -42,7 +44,7 @@ import com.caffeinatedrat.SimpleWebSockets.Util.Logger;
  * @version 1.0.0.0
  * @author CaffeinatedRat
  */
-public class ProxyConnection {
+public class ProxyConnection extends Thread {
 
     public enum StateInfo {
         
@@ -59,32 +61,31 @@ public class ProxyConnection {
     // Member Vars (fields)
     // ----------------------------------------------
     private ConfiguredServer configuredServer = null;
-    
     private Socket socket = null;
-    private StateInfo state = StateInfo.UNINITIALIZED;
+    private ProxyWriter writer = null;
     
-    //This member variable has two states due to the fact we are going to recycle it.
-    // 1) Before the connection to the server is opened, this holds the original handshake request from the client.
-    // 2) After the connection to the server is opened, this holds the handshake to the proxy connection (to the server endpoint).
+    //Reuse the handshake again...
     private Handshake handshake = null;
+    
+    //Blocking queue.
+    private Queue<Frame> framesFromClient = new LinkedList<Frame>();
+    
+    //State management of the connection.
+    private volatile StateInfo state = StateInfo.UNINITIALIZED;
+
     
     // ----------------------------------------------
     // Properties
     // ----------------------------------------------
     
-   
     /**
      * Returns true if the connection is closed.
      * @return true if the connection is closed.
      */
-    public boolean isClosed() {
+    public synchronized boolean isClosed() {
+
+        return (this.state == StateInfo.CLOSED);
         
-        if (this.socket != null) {
-            return this.socket.isClosed();
-        }
-        else {
-            return true;
-        }
     }
     
     
@@ -92,7 +93,7 @@ public class ProxyConnection {
     // Constructors
     // ----------------------------------------------
     
-    public ProxyConnection(ConfiguredServer configuredServer) {
+    public ProxyConnection(ConfiguredServer configuredServer, ProxyWriter writer, Handshake handshake) {
         
         if (configuredServer == null) {
             throw new IllegalArgumentException("The configuredServer is invalid (null).");
@@ -100,22 +101,106 @@ public class ProxyConnection {
         
         this.configuredServer = configuredServer;
         this.state = StateInfo.INITIALIZED;
-        this.handshake = null;
+        this.handshake = handshake;
+        this.writer = writer;
         
     }
+
+    // ----------------------------------------------
+    // Thread Entry Point
+    // ----------------------------------------------
+    @Override
+    public void run() {
+        
+        //Open a connection to the server for the first time.
+        if (open()) {
+            
+            //A handshake must be successful before we can proceed.
+            if (performHandshake(this.handshake)) {
+                
+                boolean continueListening = true;
+                while ( (!socket.isClosed()) && (continueListening) ) {
+                    
+                    try
+                    {
+                        
+                        //If the frames are not fragmented then write a single frame.
+                        if (framesFromClient.size() == 1) {
+                            
+                            writeToServer(framesFromClient.poll());
+                            
+                        }
+                        //If frames are fragmented we have to go into a O(n) operation where n is the number of fragments.
+                        else {
+                            
+                            //Iterate through each frame from the client.
+                            while(!framesFromClient.isEmpty()) {
+                                
+                                writeToServer(framesFromClient.poll());
+                            }
+                            
+                        }
+                        //END OF if (framesFromClient.size() == 1) {...
+
+                        FullFrameReader reader = new FullFrameReader(this.socket, null, 15000, this.configuredServer.getMaximumNumberOfSupportedFragmentedFrames());
+                        
+                        //Read frames from the server.
+                        if(reader.read()) {
+                            
+                            List<Frame> framesFromServer = reader.getFrames();
+                            
+                            if (reader.getFrameType() != Frame.OPCODE.CONNECTION_CLOSE_CONTROL_FRAME) {
+                                writeToClient(framesFromServer);
+                            }
+                            else {
+                                continueListening = false;
+                            }
+                            
+                        }
+                        
+                    }
+                    catch (InvalidFrameException e) {
+                        break;
+                    }
+                }
+                //END OF while ( (!socket.isClosed()) && (continueListening) ) {...
+                
+                close();
+            }
+            //END OF if (performHandshake(handshake)) {...
+        }
+        //END OF if (open()) {...
+    }
+    
+    // ----------------------------------------------
+    // Public Methods
+    // ----------------------------------------------
+    public synchronized void addFrames(List<Frame> frames) {
+        
+        if (frames == null) {
+            throw new IllegalArgumentException("The argument frames cannot be null.");
+        }
+        
+        this.framesFromClient.addAll(frames);
+        
+    }
+    
+    // ----------------------------------------------
+    // Internal Methods
+    // ----------------------------------------------
     
     /**
      * Attempts to open a connection to the configured server.
      * @return true if the connection was successful.
      */
-    public boolean open() {
+    protected boolean open() {
         
         //We are already connected or connecting, ignore this.
         if (this.state == StateInfo.CONNECTED || this.state == StateInfo.CONNECTING) {
             return true;
         }
         
-        if (this.state == StateInfo.INITIALIZED ) {
+        if (this.state == StateInfo.INITIALIZED) {
         
             String address = this.configuredServer.getAddress();
             
@@ -125,7 +210,6 @@ public class ProxyConnection {
                 if (this.socket != null) {
                 
                     if ( this.socket.isClosed() ) {
-                    
                         this.socket = new Socket(address, this.configuredServer.getPort());
                     }
                     
@@ -166,7 +250,7 @@ public class ProxyConnection {
     /**
      * Attempts to close a connection to the configured server.
      */
-    public void close() {
+    protected synchronized void close() {
         
         if (this.socket != null) {
             
@@ -190,7 +274,7 @@ public class ProxyConnection {
      * @param handshakeRequest An already established handshake from the original client.
      * @return true if the handshake was successful
      */
-    public boolean performHandshake(Handshake handshakeRequest) {
+    protected boolean performHandshake(Handshake handshakeRequest) {
         
         //We are already connected ignore this.
         if (this.state == StateInfo.CONNECTED) {
@@ -226,45 +310,11 @@ public class ProxyConnection {
     }
     
     /**
-     * Attempt to write everything in the inputstream to the configured server.
-     * @param buffer The buffer to write to the configured server.
-     * @param size The size of the buffer to write to the configured server.
-     * @return true if the handshake was successful
-     */
-    /*
-    private void write(byte[] buffer, int size) {
-        
-        //We can only write if the connection is still opened.
-        if (this.state == StateInfo.CONNECTED) {
-        
-            try {
-                
-                OutputStream outputStream = this.socket.getOutputStream();
-                outputStream.write(buffer, 0, size);
-                outputStream.flush();
-            
-            }
-            catch (IOException e) {
-                
-                Logger.verboseDebug(MessageFormat.format("The write cannot be performed due to some unexpected exception: {0}", e.getMessage()));
-                close();
-                
-            }
-        }
-        else {
-            
-            Logger.verboseDebug(MessageFormat.format("The write cannot be performed during this state {0}", this.state.toString()));
-            
-        }
-    }
-    */
-    
-    /**
      * Attempt to write a read frame to the configured server.
      * @param frame The stream to write to the configured server.
-     * @return true if the handshake was successful
+     * @throws InvalidFrameException if a frame is invalid.
      */    
-    public void write(Frame frame) throws InvalidFrameException {
+    protected void writeToServer(Frame frame) throws InvalidFrameException {
         
         //For now, do nothing on null frames.
         if (frame == null) {
@@ -277,12 +327,10 @@ public class ProxyConnection {
             try {
                 
                 Frame responseFrame = new Frame(frame, this.socket);
-                Logger.verboseDebug(MessageFormat.format("INPUT: {0}", responseFrame.getPayloadAsString()));
                 responseFrame.write();
             
             } catch (InvalidFrameException e) {
                  
-                Logger.verboseDebug(MessageFormat.format("An invalid frame was supplied: {0}", e.getMessage()));
                 close();
                 throw e;
 
@@ -290,35 +338,37 @@ public class ProxyConnection {
         }
         else {
             
-            Logger.verboseDebug(MessageFormat.format("The write cannot be performed during this state {0}", this.state.toString()));
+            Logger.verboseDebug(MessageFormat.format("The server write cannot be performed during this state {0}", this.state.toString()));
             
         }
+        //END OF if (this.state == StateInfo.CONNECTED) {...
     }
     
-    public List<Frame> read() throws InvalidFrameException  {
+    /**
+     * Attempt to write a read frame to the client.
+     * @param frame The stream to write to the configured server.
+     * @return true if the handshake was successful
+     * @throws InvalidFrameException if a frame is invalid.
+     */
+    protected void writeToClient(List<Frame> frames) throws InvalidFrameException {
         
-        List<Frame> frames = new ArrayList<Frame>();
-        
-        try {
-            
-            ProxyFrameReader reader = new ProxyFrameReader(this.socket, 15000);
-            while(reader.read())
-            {
-                Frame frame = reader.getFrame();
-                frames.add(new Frame(frame));
-                
-                if (frame.getOpCode() == Frame.OPCODE.CONNECTION_CLOSE_CONTROL_FRAME) {
-                    break;
-                }
-            }
-            
-        } catch (InvalidFrameException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            throw e;
+        //For now, do nothing on null frames.
+        if (frames == null) {
+            return;
         }
-
-        return frames;
-    }
+        
+        //We can only write if the connection is still opened.
+        if (this.state == StateInfo.CONNECTED) {
+        
+            this.writer.Write(frames);
+            
+        }
+        else {
+            
+            Logger.verboseDebug(MessageFormat.format("The client write cannot be performed during this state {0}", this.state.toString()));
+            
+        }
+        //END OF if (this.state == StateInfo.CONNECTED) {...
+    }    
     
 }

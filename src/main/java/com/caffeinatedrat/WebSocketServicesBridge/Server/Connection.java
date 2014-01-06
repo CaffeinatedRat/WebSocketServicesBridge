@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2012-2013, Ken Anderson <caffeinatedrat at gmail dot com>
+* Copyright (c) 2012-2014, Ken Anderson <caffeinatedrat at gmail dot com>
 * All rights reserved.
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are met:
@@ -27,13 +27,17 @@ package com.caffeinatedrat.WebSocketServicesBridge.Server;
 import java.io.*;
 import java.net.*;
 import java.text.MessageFormat;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
+
 import java.util.Set;
 
 import com.caffeinatedrat.SimpleWebSockets.Handshake;
 import com.caffeinatedrat.SimpleWebSockets.Exceptions.InvalidFrameException;
 import com.caffeinatedrat.SimpleWebSockets.Frames.Frame;
 import com.caffeinatedrat.SimpleWebSockets.Frames.FrameWriter;
+import com.caffeinatedrat.SimpleWebSockets.Frames.FullFrameReader;
 import com.caffeinatedrat.SimpleWebSockets.Util.Logger;
 
 /**
@@ -106,82 +110,62 @@ public class Connection extends Thread {
                     try {
                         
                         final Set<ConfiguredServer> configuredServers = this.server.getServers();
+                        final ProxyWriter writerToClient = new ProxyWriter(this.socket);
                         
-                        //Instantiate and prepare our collection of servers for this connection.
-                        int i = 0;
-                        ProxyConnection[] connections = new ProxyConnection[configuredServers.size()];
+                        final Queue<ProxyConnection> connections = new LinkedList<ProxyConnection>();
                         for(ConfiguredServer configuration : configuredServers) {
-                            
-                            connections[i++] = new ProxyConnection(configuration);
-                            
+                            connections.add(new ProxyConnection(configuration, writerToClient, handshake));
                         }
 
-                        //Begin reading from this connection.
-                        ProxyFrameReader reader = new ProxyFrameReader(this.socket, 15000);
+                        final FullFrameReader readerFromClient = new FullFrameReader(this.socket, null, 15000, this.server.getMaximumNumberOfSupportedFragmentedFrames());
+                        
+                        //Retrieve the number of open connections and loop until no connection is left open.
+                        //while ( (numberOfOpenConnections > 0) ) {
+                        int openConnections = connections.size();
+                        boolean initialConnection = true;
+                        while (!connections.isEmpty()) {
+                            
+                            //Read a single frame or all frames until fragmentation is done.
+                            boolean hasRead = readerFromClient.read();
+                            
+                            openConnections = 0;
+                            for(ProxyConnection connection : connections) {
+                                
+                                //During the initial connection, we spin up the threads.
+                                if(initialConnection)
+                                {
+                                    connection.start();
+                                }
+                                
+                                if(hasRead)
+                                {
+                                    List<Frame> framesFromClient = readerFromClient.getFrames();
+                                    connection.addFrames(framesFromClient);
+                                }
+                                
+                                //O(n) ....
+                                if (connection.isClosed()) {
+                                    //openConnections++;
+                                    connections.remove(connection);
+                                }
+                            }
 
-                        int numberOfOpenConnections = connections.length;
-                        while ( (numberOfOpenConnections > 0) ) {
-                        
-                            while(reader.read())
-                            {
-                                Frame readFrame = reader.getFrame();
-                                
-                                for(ProxyConnection connection : connections) {
-                                    
-                                    if (connection.open()) {
-                                        
-                                        if (connection.performHandshake(handshake)) {
-                                            
-                                            connection.write(readFrame);
-                                            
-                                        }
-                                    }
-                                    //END OF if (connection.open()) {...
-                                }
-                                //END OF for(ProxyConnection connection : connections) {...
-                                
-                                //There is nothing to read at this point, stop blocking.
-                                reader.stopBlocking();
-                                
+                            if (initialConnection) {
+                                initialConnection = false;
                             }
                             
-                            //Respond...test...
-                            for(i = 0; i < connections.length; i++) {
-                                
-                                ProxyConnection connection = connections[i];
-                                
-                                List<Frame> frames = connection.read();
-                                
-                                for(Frame frame : frames) {
-                                    
-                                    if (frame.getOpCode() != Frame.OPCODE.CONNECTION_CLOSE_CONTROL_FRAME) {
-                                    
-                                        Frame writerFrame = new Frame(frame, this.socket);
-                                        writerFrame.write();
-                                        
-                                    }
-                                    else {
-                                        
-                                        numberOfOpenConnections--;
-                                        break;
-                                        
-                                    }
-                                    
-                                }
-                            }
-                            
+                            readerFromClient.stopBlocking();
                         }
-                        //END OF while ( (numberOfOpenConnections > 0) && (this.socket.isConnected() && !this.socket.isClosed()) ) {...
-                        
-                        for(ProxyConnection connection : connections) {
-                            connection.close();
-                        }
-                        
+                        //END OF while (!connections.isEmpty()) {...
+
                     }
                     catch (Exception e) {
                         
                         Logger.severe(e.getMessage());
                         
+                    }
+                    finally {
+                        FrameWriter.writeClose(this.socket, "Bye bye");
                     }
                     
                 }
