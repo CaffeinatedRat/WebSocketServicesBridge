@@ -54,7 +54,7 @@ public class Server extends Thread {
     private int port;
     private int maximumThreads;
     private int handshakeTimeOutInMilliseconds;
-    private int maximumNumberOfSupportedFragmentedFrames = 20;
+    private int maximumFragmentationSize;
     private boolean checkOrigin;
     private boolean pingable;
     private HashSet<String> whitelist = null;
@@ -134,20 +134,20 @@ public class Server extends Thread {
     }
     
     /**
-     * Returns the maximum number of supported fragmented frames for this server.
-     * @return the maximum number of supported fragmented frames for this server.
-     */    
-    public int getMaximumNumberOfSupportedFragmentedFrames() {
-        return this.maximumNumberOfSupportedFragmentedFrames;
+     * Returns the maximum fragmentation size.
+     * @return The maximum fragmentation size.
+     */
+    public int getMaximumFragmentationSize() {
+        return this.maximumFragmentationSize;
     }
     
     /**
-     * Sets the maximum number of supported fragmented frames for this server.
-     * @param maximumNumberOfSupportedFragmentedFrames the maximum number of supported fragmented frames for this server.
-     */    
-    public void setMaximumNumberOfSupportedFragmentedFrames(int maximumNumberOfSupportedFragmentedFrames) {
-        this.maximumNumberOfSupportedFragmentedFrames = maximumNumberOfSupportedFragmentedFrames;
-    }     
+     * Sets the maximum fragmentation size.
+     * @param timeout The maximum fragmentation size.
+     */
+    public void setMaximumFragmentationSize(int maximumFragmentationSize) {
+        this.maximumFragmentationSize = maximumFragmentationSize;
+    }
     
     /**
      * Determines if the websockets server is publicly available or by white-list only.
@@ -203,7 +203,7 @@ public class Server extends Thread {
             this.whitelist = new HashSet<String>();
             if(!loadWhiteList())
             {
-                //TO-DO: Create the white-list.txt and bail.
+                //TODO: Create the white-list.txt and bail.
                 Logger.severe("The white-list was not found...");
             }
         }

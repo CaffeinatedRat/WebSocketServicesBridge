@@ -6,7 +6,11 @@ websocketservicesbridge:
   #Sets the maximum number of connections the server can handle concurrently.
   maximumConnections: 32
   #Sets the number of milliseconds that the server will wait for a handshake to complete.
-  handshakeTimeOutTolerance: 1000  
+  handshakeTimeOutTolerance: 1000
+  #Sets the number of milliseconds that the server will wait for a frame to complete before terminating the connection.
+  frameTimeOutTolerance: 3000
+  #Sets the maximum number of frames that can be sent in a single request to your server.  The higher this value is the more likely someone can reduce your servers performance if they flood you with large size requests.
+  maximumFragmentationSize: 2
   #Determines if the origin is valid during the handshake.  If the origin is null, it is invalid and the connection is rejected.
   checkOrigin: true
   #Determines if the websocket services are only available to certain ips.  Note that this checks the origin header field during the handshake and can be spoofed by non-browser clients.

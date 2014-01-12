@@ -62,7 +62,7 @@ public class ProxyConnection extends Thread {
     // ----------------------------------------------
     private ConfiguredServer configuredServer = null;
     private Socket socket = null;
-    private ProxyWriter writer = null;
+    private ProxyFrameWriter writer = null;
     
     //Reuse the handshake again...
     private Handshake handshake = null;
@@ -93,7 +93,7 @@ public class ProxyConnection extends Thread {
     // Constructors
     // ----------------------------------------------
     
-    public ProxyConnection(ConfiguredServer configuredServer, ProxyWriter writer, Handshake handshake) {
+    public ProxyConnection(ConfiguredServer configuredServer, ProxyFrameWriter writer, Handshake handshake) {
         
         if (configuredServer == null) {
             throw new IllegalArgumentException("The configuredServer is invalid (null).");
@@ -121,8 +121,7 @@ public class ProxyConnection extends Thread {
                 boolean continueListening = true;
                 while ( (!socket.isClosed()) && (continueListening) ) {
                     
-                    try
-                    {
+                    try {
                         
                         //If the frames are not fragmented then write a single frame.
                         if (framesFromClient.size() == 1) {
@@ -142,7 +141,7 @@ public class ProxyConnection extends Thread {
                         }
                         //END OF if (framesFromClient.size() == 1) {...
 
-                        FullFrameReader reader = new FullFrameReader(this.socket, null, 15000, this.configuredServer.getMaximumNumberOfSupportedFragmentedFrames());
+                        FullFrameReader reader = new FullFrameReader(this.socket, null, 15000, this.configuredServer.getMaximumFragmentationSize());
                         
                         //Read frames from the server.
                         if(reader.read()) {
@@ -157,6 +156,7 @@ public class ProxyConnection extends Thread {
                             }
                             
                         }
+                        //END OF if(reader.read()) {...
                         
                     }
                     catch (InvalidFrameException e) {
@@ -175,6 +175,11 @@ public class ProxyConnection extends Thread {
     // ----------------------------------------------
     // Public Methods
     // ----------------------------------------------
+    
+    /**
+     * Adds frames to the connection to be passed onto the configured server.
+     * @params frames if the connection was successful.
+     */
     public synchronized void addFrames(List<Frame> frames) {
         
         if (frames == null) {
@@ -239,9 +244,7 @@ public class ProxyConnection extends Thread {
             }
         }
         else {
-            
             Logger.verboseDebug(MessageFormat.format("The connection cannot be opened during this state {0}", this.state.toString()));
-            
         }
         
         return false;
@@ -292,16 +295,12 @@ public class ProxyConnection extends Thread {
                 
             }
             else {
-                
                 Logger.verboseDebug("The handshake has failed.");
-                
             }
             
         }
         else {
-            
             Logger.verboseDebug(MessageFormat.format("The handshake cannot be performed during this state {0}", this.state.toString()));
-            
         }
         
         //Close the socket.
@@ -311,7 +310,7 @@ public class ProxyConnection extends Thread {
     
     /**
      * Attempt to write a read frame to the configured server.
-     * @param frame The stream to write to the configured server.
+     * @param frame The frame to write to the configured server.
      * @throws InvalidFrameException if a frame is invalid.
      */    
     protected void writeToServer(Frame frame) throws InvalidFrameException {
@@ -326,8 +325,8 @@ public class ProxyConnection extends Thread {
         
             try {
                 
-                Frame responseFrame = new Frame(frame, this.socket);
-                responseFrame.write();
+                //TODO: --Performance Improvement
+                frame.write(this.socket);
             
             } catch (InvalidFrameException e) {
                  
@@ -337,17 +336,14 @@ public class ProxyConnection extends Thread {
             }
         }
         else {
-            
             Logger.verboseDebug(MessageFormat.format("The server write cannot be performed during this state {0}", this.state.toString()));
-            
         }
         //END OF if (this.state == StateInfo.CONNECTED) {...
     }
     
     /**
      * Attempt to write a read frame to the client.
-     * @param frame The stream to write to the configured server.
-     * @return true if the handshake was successful
+     * @param frame The frames to write to the client.
      * @throws InvalidFrameException if a frame is invalid.
      */
     protected void writeToClient(List<Frame> frames) throws InvalidFrameException {
@@ -359,14 +355,11 @@ public class ProxyConnection extends Thread {
         
         //We can only write if the connection is still opened.
         if (this.state == StateInfo.CONNECTED) {
-        
-            this.writer.Write(frames);
-            
+            //this.writer.Write(frames, this.configuredServer.getServerName());
+            this.writer.Write(frames, Thread.currentThread().getName());
         }
         else {
-            
             Logger.verboseDebug(MessageFormat.format("The client write cannot be performed during this state {0}", this.state.toString()));
-            
         }
         //END OF if (this.state == StateInfo.CONNECTED) {...
     }    

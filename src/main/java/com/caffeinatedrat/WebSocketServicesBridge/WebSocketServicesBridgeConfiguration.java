@@ -151,6 +151,47 @@ public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {
     }
     
     /**
+     * Safely returns the frame timeout in milliseconds.
+     * @return safely returns the frame timeout in milliseconds.
+     */
+    public int getFrameTimeOutTolerance() {
+        
+        int timeout = getInt("websocketservicesbridge.frameTimeOutTolerance", 3000);
+        
+        //Validate
+        if (timeout < 0) {
+        
+            Logger.warning(MessageFormat.format("The frame timeout tolerance {0} is invalid, defaulting to 3000.", timeout));
+            return 3000;
+            
+        }
+        
+        return timeout;
+        
+    }
+
+    /**
+     * Safely returns the maximum fragmentation size.
+     * @return returns the maximum fragmentation size.
+     */    
+    public int getMaximumFragmentationSize() {
+     
+        int maximumFragmentationSize = getInt("websocketservicesbridge.maximumFragmentationSize", 2);
+        
+        //Validate
+        if (maximumFragmentationSize < 0) {
+        
+            Logger.warning(MessageFormat.format("The maximum fragmentation size {0} is invalid, defaulting to 2.", maximumFragmentationSize));
+            return 2;
+            
+        }
+        
+        return maximumFragmentationSize;
+        
+    }
+        
+    
+    /**
      * Determines if the origin is checked when establishing a connection.
      * @return true if the origin is checked when establishing a connection.
      */
@@ -187,7 +228,7 @@ public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {
                     try {
                         
                         //Add the configured server if the address information is a valid host and port.
-                        ConfiguredServer configuredServerInfo = new ConfiguredServer(serverKey, configSection.getString(serverKey + ".address"));
+                        ConfiguredServer configuredServerInfo = new ConfiguredServer(serverKey, configSection.getString(serverKey + ".address"), getMaximumFragmentationSize());
                         
                         if(!configuredServers.contains(configuredServerInfo)) {
                             

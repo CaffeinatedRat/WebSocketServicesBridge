@@ -38,7 +38,7 @@ import com.caffeinatedrat.SimpleWebSockets.Util.Logger;
  * @version 1.0.0.0
  * @author CaffeinatedRat
  */
-public class ProxyWriter {
+public class ProxyFrameWriter {
 
     // ----------------------------------------------
     // Member Vars (fields)
@@ -49,7 +49,11 @@ public class ProxyWriter {
     // Constructors
     // ----------------------------------------------
     
-    public ProxyWriter(Socket socket) {
+    /**
+     * Constructor
+     * @param socket the socket to write frames to.
+     */
+    public ProxyFrameWriter(Socket socket) {
         
         if (socket == null) {
             throw new IllegalArgumentException("The socket is invalid (null).");
@@ -62,17 +66,54 @@ public class ProxyWriter {
     // ----------------------------------------------
     // Public Methods
     // ----------------------------------------------
-    public synchronized void Write(List<Frame> frames) throws InvalidFrameException {
+    
+    /**
+     * Writes a collection of frames to an endpoint.
+     * @param frames the frames to write to an endpoint.
+     * @param serverName the servername to include in the frame wrapper.
+     * @throws InvalidFrameException if the frame is invalid.
+     */
+    public synchronized void Write(List<Frame> frames, String serverName) throws InvalidFrameException {
         
-        for(Frame frame : frames) {
-            
-            String string = frame.getPayloadAsString();
-            Logger.verboseDebug(MessageFormat.format("Writing frame: {0}", string));
-            
-            Frame responseFrame = new Frame(frame, this.socket);
-            responseFrame.write();
+        if (frames == null) {
+            return;
         }
-
+        
+        if(frames.size() > 0) {
+            
+            Frame.OPCODE opCode = frames.get(0).getOpCode();
+            
+            if (opCode == Frame.OPCODE.TEXT_DATA_FRAME) {
+                
+                Frame header = new Frame(this.socket);
+                header.clearFinalFragment();
+                header.setOpCode(opCode);
+                header.setPayload(MessageFormat.format("'{'\"serverName\":\"{0}\",\"serverInfo\":", serverName));
+                header.write();
+                
+                frames.get(0).clearFinalFragment();
+                frames.get(0).setOpCode(Frame.OPCODE.CONTINUATION_DATA_FRAME);
+                
+            }
+            //END OF if (opCode == Frame.OPCODE.TEXT_DATA_FRAME) {...
+            
+            for(Frame frame : frames) {
+                frame.write(this.socket);
+            }
+            
+            if (opCode == Frame.OPCODE.TEXT_DATA_FRAME) {
+                
+                Frame footer = new Frame(this.socket);
+                footer.setFinalFragment();
+                footer.setOpCode(Frame.OPCODE.CONTINUATION_DATA_FRAME);
+                footer.setPayload("}");
+                footer.write();
+                
+            }
+            //END OF if (opCode == Frame.OPCODE.TEXT_DATA_FRAME) {...
+        }
+        //END OF if(frames.size() > 0) {...
+        
     }
     
 }

@@ -61,6 +61,7 @@ public class WebSocketServicesBridge extends Plugin {
         server.setHandshakeTimeout(config.getHandshakeTimeOut());
         server.setOriginCheck(config.getCheckOrigin());
         server.setPingable(config.getIsPingable());
+        server.setMaximumFragmentationSize(config.getMaximumFragmentationSize());
         
         server.start();
 

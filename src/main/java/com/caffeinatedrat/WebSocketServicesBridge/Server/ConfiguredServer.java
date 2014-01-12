@@ -47,7 +47,7 @@ public class ConfiguredServer {
     private String serverName;
     private String hostAddress;
     private int port;
-    private int maximumNumberOfSupportedFragmentedFrames;
+    private int maximumFragmentationSize;
     
     // ----------------------------------------------
     // Properties
@@ -78,27 +78,27 @@ public class ConfiguredServer {
     }
     
     /**
-     * Returns the maximum number of supported fragmented frames for this server.
-     * @return the maximum number of supported fragmented frames for this server.
-     */    
-    public int getMaximumNumberOfSupportedFragmentedFrames() {
-        return this.maximumNumberOfSupportedFragmentedFrames;
+     * Returns the maximum fragmentation size.
+     * @return The maximum fragmentation size.
+     */
+    public int getMaximumFragmentationSize() {
+        return this.maximumFragmentationSize;
     }
     
     // ----------------------------------------------
     // Constructors
     // ----------------------------------------------
     
-    public ConfiguredServer(String serverName, String hostAddress, int port, int maximumNumberOfSupportedFragmentedFrames) {
+    public ConfiguredServer(String serverName, String hostAddress, int port, int maximumFragmentationSize) {
         
         this.serverName = serverName;
         this.hostAddress = hostAddress;
         this.port = port;
-        this.maximumNumberOfSupportedFragmentedFrames = maximumNumberOfSupportedFragmentedFrames;
+        this.maximumFragmentationSize = maximumFragmentationSize;
         
     }
     
-    public ConfiguredServer(String serverName, String address, int maximumNumberOfSupportedFragmentedFrames) 
+    public ConfiguredServer(String serverName, String address, int maximumFragmentationSize) 
             throws InvalidConfiguredServerInfoException {
         
         this.serverName = serverName;
@@ -124,7 +124,7 @@ public class ConfiguredServer {
             
         }
         
-        this.maximumNumberOfSupportedFragmentedFrames = maximumNumberOfSupportedFragmentedFrames;
+        this.maximumFragmentationSize = maximumFragmentationSize;
     }
     
     public ConfiguredServer(String serverName, String address) 
