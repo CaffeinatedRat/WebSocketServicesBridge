@@ -27,9 +27,8 @@ package com.caffeinatedrat.WebSocketServicesBridge.Server;
 import java.io.*;
 import java.net.*;
 import java.text.MessageFormat;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
 
 import java.util.Set;
 
@@ -110,20 +109,20 @@ public class Connection extends Thread {
                     try {
                         
                         final Set<ConfiguredServer> configuredServers = this.server.getServers();
-                        final ProxyWriter writerToClient = new ProxyWriter(this.socket);
+                        final ProxyFrameWriter writerToClient = new ProxyFrameWriter(this.socket);
                         
-                        final Queue<ProxyConnection> connections = new LinkedList<ProxyConnection>();
+                        final List<ProxyConnection> connections = new ArrayList<ProxyConnection>();
                         for(ConfiguredServer configuration : configuredServers) {
                             connections.add(new ProxyConnection(configuration, writerToClient, handshake));
                         }
-
-                        final FullFrameReader readerFromClient = new FullFrameReader(this.socket, null, 15000, this.server.getMaximumNumberOfSupportedFragmentedFrames());
+                        
+                        final FullFrameReader readerFromClient = new FullFrameReader(this.socket, null, 15000, this.server.getMaximumFragmentationSize());
                         
                         //Retrieve the number of open connections and loop until no connection is left open.
-                        //while ( (numberOfOpenConnections > 0) ) {
-                        int openConnections = connections.size();
+                        int openConnections = 0;
                         boolean initialConnection = true;
-                        while (!connections.isEmpty()) {
+                        
+                        do {
                             
                             //Read a single frame or all frames until fragmentation is done.
                             boolean hasRead = readerFromClient.read();
@@ -132,37 +131,30 @@ public class Connection extends Thread {
                             for(ProxyConnection connection : connections) {
                                 
                                 //During the initial connection, we spin up the threads.
-                                if(initialConnection)
-                                {
+                                if(initialConnection) {
                                     connection.start();
                                 }
                                 
-                                if(hasRead)
-                                {
+                                if(hasRead) {
                                     List<Frame> framesFromClient = readerFromClient.getFrames();
                                     connection.addFrames(framesFromClient);
                                 }
                                 
-                                //O(n) ....
-                                if (connection.isClosed()) {
-                                    //openConnections++;
-                                    connections.remove(connection);
+                                if (!connection.isClosed()) {
+                                    openConnections++;
                                 }
                             }
-
+                            
                             if (initialConnection) {
                                 initialConnection = false;
                             }
                             
                             readerFromClient.stopBlocking();
-                        }
-                        //END OF while (!connections.isEmpty()) {...
-
+                            
+                        } while (openConnections > 0);
                     }
                     catch (Exception e) {
-                        
                         Logger.severe(e.getMessage());
-                        
                     }
                     finally {
                         FrameWriter.writeClose(this.socket, "Bye bye");
@@ -173,6 +165,7 @@ public class Connection extends Thread {
                     
                     Logger.debug("Handshaking failure.");
                     FrameWriter.writeClose(this.socket, "The handshaking has failed.");
+                    
                 }
                 //END OF if(handshake.processRequest())...
             }
@@ -181,24 +174,21 @@ public class Connection extends Thread {
                 Logger.debug("The frame is invalid.");
                 
                 try {
-                    
                     FrameWriter.writeClose(this.socket, "The frame was invalid.");
-                    
                 }
                 catch(InvalidFrameException ife) {
                     //Do nothing...
                 }
                 
             }
-
+            
             Logger.debug(MessageFormat.format("Connection {0} terminated.", this.id));
             Logger.verboseDebug(MessageFormat.format("Thread {0} has spun down...", this.getName()));
+            
         }
         finally {
-
-            //NOTE: Do not close the connection!
             close();
-        }        
+        }
     }
     
     /**
