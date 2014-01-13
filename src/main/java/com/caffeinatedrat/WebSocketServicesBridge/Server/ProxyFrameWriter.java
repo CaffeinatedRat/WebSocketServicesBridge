@@ -30,7 +30,6 @@ import java.util.List;
 
 import com.caffeinatedrat.SimpleWebSockets.Exceptions.InvalidFrameException;
 import com.caffeinatedrat.SimpleWebSockets.Frames.Frame;
-import com.caffeinatedrat.SimpleWebSockets.Util.Logger;
 
 /**
  * Handles writing to the client from the proxy.
@@ -91,13 +90,14 @@ public class ProxyFrameWriter {
                 header.setPayload(MessageFormat.format("'{'\"serverName\":\"{0}\",\"serverInfo\":", serverName));
                 header.write();
                 
-                frames.get(0).clearFinalFragment();
-                frames.get(0).setOpCode(Frame.OPCODE.CONTINUATION_DATA_FRAME);
-                
             }
             //END OF if (opCode == Frame.OPCODE.TEXT_DATA_FRAME) {...
             
             for(Frame frame : frames) {
+
+                frame.clearFinalFragment();
+                frame.setOpCode(Frame.OPCODE.CONTINUATION_DATA_FRAME);
+                
                 frame.write(this.socket);
             }
             
