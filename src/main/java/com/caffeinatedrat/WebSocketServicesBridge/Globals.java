@@ -37,6 +37,7 @@ public class Globals {
     // ----------------------------------------------
     public static final String PLUGIN_FOLDER = "plugins/WebSocketServicesBridge";
     public static final String WHITE_LIST_FILENAME = "White-list.txt";
+    public static final String CONFIG_FILE = "config.yml";
     
     // ----------------------------------------------
     // Global Vars.

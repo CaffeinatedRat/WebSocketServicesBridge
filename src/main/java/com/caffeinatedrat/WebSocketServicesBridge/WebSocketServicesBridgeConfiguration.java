@@ -24,9 +24,13 @@
 
 package com.caffeinatedrat.WebSocketServicesBridge;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.HashSet;
 import java.util.Set;
@@ -269,13 +273,67 @@ public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {
         
         this.pluginInfo = plugin;
         
+        extractConfigFile();
+        
         try {
-            load(new File(plugin.getDataFolder(), "config.yml"));
+            load(new File(plugin.getDataFolder(), Globals.CONFIG_FILE));
         } catch (FileNotFoundException e) {
+            
         } catch (IOException e) {
-            Logger.severe("Cannot load config.yml");
+            Logger.severe(MessageFormat.format("Cannot load {0}", Globals.CONFIG_FILE));
         } catch (InvalidConfigurationException e) {
-            Logger.severe("Cannot load config.yml");
+            Logger.severe(MessageFormat.format("Cannot load {0}", Globals.CONFIG_FILE));
         }
     }
+    
+    // ----------------------------------------------
+    // Methods
+    // ----------------------------------------------
+    
+    /**
+     * Extracts the default configuration file if one does not exist.
+     */
+    private void extractConfigFile() {
+        
+        File dataFolder = this.pluginInfo.getDataFolder();
+        
+        //Create the destination path for the configuration file.
+        File destinationPath = new File(dataFolder, Globals.CONFIG_FILE);
+        
+        //Determine if it already exists.
+        if(!destinationPath.exists()) {
+
+            //Create the plugin directory if it doesn't exist.
+            dataFolder.mkdir();
+            
+            try {
+                
+                //Create the file if it does not and extract the contents from the jar.
+                if( destinationPath.createNewFile() ) {
+                
+                    final OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(destinationPath));
+                    final InputStream inputStream =  WebSocketServicesBridge.class.getClassLoader().getResourceAsStream(Globals.CONFIG_FILE);
+                    
+                    try {
+                        final byte[] buff = new byte[4096];
+                        int n;
+                        while ((n = inputStream.read(buff)) > 0) {
+                            outputStream.write(buff, 0, n);
+                        }
+                    } finally {
+                        outputStream.flush();
+                        outputStream.close();
+                        inputStream.close();
+                    }
+                    
+                }
+                
+            }
+            catch (IOException e) {
+                Logger.severe(MessageFormat.format("Cannot extract the config.yml from the jar.  Unable to load the {0}.", Globals.CONFIG_FILE));
+            }
+        }
+        
+    }
+    
 }
