@@ -87,7 +87,8 @@ public class ProxyFrameWriter {
                 Frame header = new Frame(this.socket);
                 header.clearFinalFragment();
                 header.setOpCode(opCode);
-                header.setPayload(MessageFormat.format("'{'\"serverName\":\"{0}\",\"serverInfo\":", serverName));
+                //TODO: Version number in the WSSB.
+                header.setPayload(MessageFormat.format("'{'\"WSSB\": 1, \"serverName\":\"{0}\",\"serverInfo\":", serverName));
                 header.write();
                 
             }
