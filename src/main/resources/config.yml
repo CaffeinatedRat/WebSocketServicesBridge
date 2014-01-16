@@ -1,6 +1,6 @@
 #Configuration for the websocket bridge.
 websocketservicesbridge:
-  portNumber: 25564
+  portNumber: 25568
   #Logs to the console (0 = off, 1 = simple, 2 = verbose).
   logging: 0
   #Sets the maximum number of connections the server can handle concurrently.
@@ -17,8 +17,6 @@ websocketservicesbridge:
   whitelist: false
   #Determines if the server is pingable via websockets (This is reserved as a future feature as most browers do not support a websocket ping method).
   pingable: false
-  #Determines the state of the bridge.
-  state: passive
 #A list of websocketservers to bridge.
 websocketservers:
   minecraft1:
