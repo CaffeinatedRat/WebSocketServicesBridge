@@ -356,7 +356,7 @@ public class ProxyConnection extends Thread {
         //We can only write if the connection is still opened.
         if (this.state == StateInfo.CONNECTED) {
             //this.writer.Write(frames, this.configuredServer.getServerName());
-            this.writer.Write(frames, Thread.currentThread().getName());
+            this.writer.Write(frames, this.configuredServer.getServerName());
         }
         else {
             Logger.verboseDebug(MessageFormat.format("The client write cannot be performed during this state {0}", this.state.toString()));
