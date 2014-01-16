@@ -73,7 +73,6 @@ public class WebSocketServicesBridge extends Plugin {
     @Override
     public void onDisable() {
         // save the configuration file, if there are no values, write the defaults.
-
     }
     
     /*
@@ -84,6 +83,7 @@ public class WebSocketServicesBridge extends Plugin {
         
         //Override the logger.
         Logger.logger = this.getLogger();
+        
     }
     
     // ----------------------------------------------
