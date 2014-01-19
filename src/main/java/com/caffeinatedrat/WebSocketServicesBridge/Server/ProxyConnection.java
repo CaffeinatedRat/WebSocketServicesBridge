@@ -83,11 +83,8 @@ public class ProxyConnection extends Thread {
      * @return true if the connection is closed.
      */
     public synchronized boolean isClosed() {
-
         return (this.state == StateInfo.CLOSED);
-        
     }
-    
     
     // ----------------------------------------------
     // Constructors
@@ -135,16 +132,13 @@ public class ProxyConnection extends Thread {
 
                             //If the frames are not fragmented then write a single frame.
                             if (this.framesFromClient.size() == 1) {
-                                
                                 writeToServer(this.framesFromClient.poll());
-                                
                             }
                             //If frames are fragmented we have to go into a O(n) operation where n is the number of fragments.
                             else {
                                 
                                 //Iterate through each frame from the client.
                                 while(!this.framesFromClient.isEmpty()) {
-                                    
                                     writeToServer(this.framesFromClient.poll());
                                 }
                                 
