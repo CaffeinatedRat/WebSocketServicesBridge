@@ -28,9 +28,9 @@ import java.io.IOException;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.text.MessageFormat;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import com.caffeinatedrat.SimpleWebSockets.Handshake;
 import com.caffeinatedrat.SimpleWebSockets.Exceptions.InvalidFrameException;
@@ -65,10 +65,10 @@ public class ProxyConnection extends Thread {
     private ProxyFrameWriter writer = null;
     
     //Reuse the handshake again...
-    private Handshake handshake = null;
+    private Handshake handshake = null;  
     
     //Blocking queue.
-    private Queue<Frame> framesFromClient = new LinkedList<Frame>();
+    private BlockingQueue<Frame> framesFromClient = new LinkedBlockingQueue<Frame>();
     
     //State management of the connection.
     private volatile StateInfo state = StateInfo.UNINITIALIZED;
@@ -112,64 +112,76 @@ public class ProxyConnection extends Thread {
     @Override
     public void run() {
         
-        //Open a connection to the server for the first time.
-        if (open()) {
-            
-            //A handshake must be successful before we can proceed.
-            if (performHandshake(this.handshake)) {
+        try {
+            //Open a connection to the server for the first time.
+            if (open()) {
                 
-                boolean continueListening = true;
-                while ( (!socket.isClosed()) && (continueListening) ) {
+                //A handshake must be successful before we can proceed.
+                if (performHandshake(this.handshake)) {
                     
+                    //Instantiate the reader outside of the loop so that we can prevent blocking.
+                    FullFrameReader reader = null;
                     try {
+                        reader = new FullFrameReader(this.socket, null, 15000, this.configuredServer.getMaximumFragmentationSize());
+                    } catch (InvalidFrameException e) {
+                        Logger.verboseDebug(MessageFormat.format("Unable to create a FullFrameReader: {0}", e.getMessage()));
+                        return;
+                    }
+                    
+                    boolean continueListening = true;
+                    while ( (!socket.isClosed()) && (continueListening) ) {
                         
-                        //If the frames are not fragmented then write a single frame.
-                        if (framesFromClient.size() == 1) {
-                            
-                            writeToServer(framesFromClient.poll());
-                            
-                        }
-                        //If frames are fragmented we have to go into a O(n) operation where n is the number of fragments.
-                        else {
-                            
-                            //Iterate through each frame from the client.
-                            while(!framesFromClient.isEmpty()) {
-                                
-                                writeToServer(framesFromClient.poll());
-                            }
-                            
-                        }
-                        //END OF if (framesFromClient.size() == 1) {...
+                        try {
 
-                        FullFrameReader reader = new FullFrameReader(this.socket, null, 15000, this.configuredServer.getMaximumFragmentationSize());
-                        
-                        //Read frames from the server.
-                        if(reader.read()) {
-                            
-                            List<Frame> framesFromServer = reader.getFrames();
-                            
-                            if (reader.getFrameType() != Frame.OPCODE.CONNECTION_CLOSE_CONTROL_FRAME) {
-                                writeToClient(framesFromServer);
+                            //If the frames are not fragmented then write a single frame.
+                            if (this.framesFromClient.size() == 1) {
+                                
+                                writeToServer(this.framesFromClient.poll());
+                                
                             }
+                            //If frames are fragmented we have to go into a O(n) operation where n is the number of fragments.
                             else {
-                                continueListening = false;
+                                
+                                //Iterate through each frame from the client.
+                                while(!this.framesFromClient.isEmpty()) {
+                                    
+                                    writeToServer(this.framesFromClient.poll());
+                                }
+                                
                             }
+                            //END OF if (framesFromClient.size() == 1) {...
+    
+                            //Read frames from the server.
+                            if(reader.read()) {
+                                
+                                List<Frame> framesFromServer = reader.getFrames();
+                                
+                                if (reader.getFrameType() != Frame.OPCODE.CONNECTION_CLOSE_CONTROL_FRAME) {
+                                    writeToClient(framesFromServer);
+                                }
+                                else {
+                                    continueListening = false;
+                                }
+                                
+                            }
+                            //END OF if(reader.read()) {...
                             
+                            reader.stopBlocking();
+
                         }
-                        //END OF if(reader.read()) {...
-                        
+                        catch (InvalidFrameException e) {
+                            break;
+                        }
                     }
-                    catch (InvalidFrameException e) {
-                        break;
-                    }
+                    //END OF while ( (!socket.isClosed()) && (continueListening) ) {...
                 }
-                //END OF while ( (!socket.isClosed()) && (continueListening) ) {...
-                
-                close();
+                //END OF if (performHandshake(handshake)) {...
             }
-            //END OF if (performHandshake(handshake)) {...
+            //END OF if (open()) {...
         }
-        //END OF if (open()) {...
+        finally {
+            close();
+        }
     }
     
     // ----------------------------------------------
@@ -180,7 +192,7 @@ public class ProxyConnection extends Thread {
      * Adds frames to the connection to be passed onto the configured server.
      * @params frames if the connection was successful.
      */
-    public synchronized void addFrames(List<Frame> frames) {
+    public void addFrames(List<Frame> frames) {
         
         if (frames == null) {
             throw new IllegalArgumentException("The argument frames cannot be null.");
@@ -324,6 +336,8 @@ public class ProxyConnection extends Thread {
         if (this.state == StateInfo.CONNECTED) {
         
             try {
+                
+                Logger.verboseDebug(MessageFormat.format("Writing {0}", frame.getPayloadAsString()));
                 
                 //TODO: --Performance Improvement
                 frame.write(this.socket);
