@@ -88,7 +88,7 @@ public class ProxyFrameWriter {
                 header.clearFinalFragment();
                 header.setOpCode(opCode);
                 //TODO: Version number in the WSSB.
-                header.setPayload(MessageFormat.format("'{'\"WSSB\": 1, \"serverName\":\"{0}\",\"serverInfo\":", serverName));
+                header.setPayload(MessageFormat.format("'{'\"wssb\": 1, \"serverName\":\"{0}\",\"serverInfo\":", serverName));
                 header.write();
                 
             }
