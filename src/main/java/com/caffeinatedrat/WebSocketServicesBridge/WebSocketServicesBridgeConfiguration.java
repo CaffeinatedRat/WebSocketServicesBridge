@@ -235,23 +235,16 @@ public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {
                         ConfiguredServer configuredServerInfo = new ConfiguredServer(serverKey, configSection.getString(serverKey + ".address"), getMaximumFragmentationSize());
                         
                         if(!configuredServers.contains(configuredServerInfo)) {
-                            
                             configuredServers.add(configuredServerInfo);
-                            
                         }
                         else {
-                            
                             Logger.info(MessageFormat.format("The configured WebSocketServer {0} already exists.", serverKey));
-                            
                         }
                         
                     }
                     catch(InvalidConfiguredServerInfoException ex) {
-                        
                         Logger.info(ex.getMessage());
-                        
                     }
-
                 }
                 
             }
