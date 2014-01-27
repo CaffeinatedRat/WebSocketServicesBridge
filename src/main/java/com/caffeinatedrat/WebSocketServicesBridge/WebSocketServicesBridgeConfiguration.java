@@ -47,6 +47,17 @@ import com.caffeinatedrat.SimpleWebSockets.Util.Logger;
 public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {
 
     // ----------------------------------------------
+    // Data Types
+    // ----------------------------------------------
+    
+    //Service states.
+    public enum ServiceState {
+        Off,
+        Active,
+        Passive
+    };
+    
+    // ----------------------------------------------
     // Member Vars (fields)
     // ----------------------------------------------
     
@@ -177,7 +188,7 @@ public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {
     /**
      * Safely returns the maximum fragmentation size.
      * @return returns the maximum fragmentation size.
-     */    
+     */
     public int getMaximumFragmentationSize() {
      
         int maximumFragmentationSize = getInt("websocketservicesbridge.maximumFragmentationSize", 2);
@@ -194,7 +205,6 @@ public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {
         
     }
         
-    
     /**
      * Determines if the origin is checked when establishing a connection.
      * @return true if the origin is checked when establishing a connection.
@@ -209,6 +219,34 @@ public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {
      */
     public boolean getIsPingable() {
         return getBoolean("websocketservicesbridge.pingable", false);
+    }
+    
+    /**
+     * Determines if a disabled service should mute its response.
+     * @return true if a disabled service should mute its response.
+     */
+    public boolean getMuteDisabledServices() {
+        return getBoolean("websocketservicesbridge.muteDisabledServices", false);
+    }
+    
+    /**
+     * Returns the service state.
+     * Precondition: The serviceName should be lower-case.
+     * @param the name of the service.
+     * @return the service state.
+     */
+    public ServiceState getServiceState(String serviceName) {
+        
+        String serviceState = getString("services." + serviceName);
+        
+        if (serviceState.equalsIgnoreCase("active")) {
+            return ServiceState.Active;
+        }
+        else if (serviceState.equalsIgnoreCase("off")) {
+            return ServiceState.Off;
+        }
+        
+        return ServiceState.Passive;
     }
     
     /**
@@ -233,6 +271,7 @@ public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {
                         
                         //Add the configured server if the address information is a valid host and port.
                         ConfiguredServer configuredServerInfo = new ConfiguredServer(serverKey, configSection.getString(serverKey + ".address"), getMaximumFragmentationSize());
+                        configuredServerInfo.setFrameTimeoutTolerance(this.getFrameTimeOutTolerance());
                         
                         if(!configuredServers.contains(configuredServerInfo)) {
                             configuredServers.add(configuredServerInfo);
@@ -255,7 +294,6 @@ public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {
         return configuredServers;
         
     }
-    
     
     // ----------------------------------------------
     // Constructors
@@ -282,6 +320,21 @@ public class WebSocketServicesBridgeConfiguration extends YamlConfiguration {
     // ----------------------------------------------
     // Methods
     // ----------------------------------------------
+    
+    public void saveConfig() {
+        try {
+            
+            File dataFolder = this.pluginInfo.getDataFolder();
+            
+            //Create the destination path for the configuration file.
+            File destinationPath = new File(dataFolder, Globals.CONFIG_FILE);
+            
+            save(destinationPath);
+            
+        } catch (IOException ex) {
+            Logger.severe(MessageFormat.format("Could not save config to {0}", Globals.CONFIG_FILE));
+        }
+    }
     
     /**
      * Extracts the default configuration file if one does not exist.

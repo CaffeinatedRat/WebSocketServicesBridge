@@ -24,6 +24,7 @@
 
 package com.caffeinatedrat.WebSocketServicesBridge;
 
+import com.caffeinatedrat.WebSocketServicesBridge.Server.IServiceLayer;
 import com.caffeinatedrat.WebSocketServicesBridge.Server.Server;
 import com.caffeinatedrat.SimpleWebSockets.Util.Logger;
 
@@ -42,6 +43,21 @@ public class WebSocketServicesBridge extends Plugin {
     // ----------------------------------------------
     
     private Server server = null;
+    private WebSocketServicesBridgeConfiguration config = null;
+    
+    // ----------------------------------------------
+    // Properties
+    // ----------------------------------------------
+    
+    /**
+     * Returns the configuration.
+     * @return Returns the configuration.
+     */
+    public WebSocketServicesBridgeConfiguration getConfig() {
+        
+        return this.config;
+        
+    }
     
     // ----------------------------------------------
     // Events
@@ -53,15 +69,18 @@ public class WebSocketServicesBridge extends Plugin {
     @Override
     public void onEnable() {
         
-        WebSocketServicesBridgeConfiguration config = new WebSocketServicesBridgeConfiguration(this);
-        Logger.debugLevel = config.getDebugLevel();
+        this.config = new WebSocketServicesBridgeConfiguration(this);
+        Logger.debugLevel = this.config.getDebugLevel();
+        
+        IServiceLayer serviceLayer = new ServiceLayer(this);
         
         //Start-up the server with all the appropriate configuration values.
-        server = new Server(config.getPortNumber(), config.getConfiguredServers(), config.getIsWhiteListed(), config.getMaximumConnections());
-        server.setHandshakeTimeout(config.getHandshakeTimeOut());
-        server.setOriginCheck(config.getCheckOrigin());
-        server.setPingable(config.getIsPingable());
-        server.setMaximumFragmentationSize(config.getMaximumFragmentationSize());
+        server = new Server(this.config.getPortNumber(), serviceLayer, this.config.getConfiguredServers(), this.config.getIsWhiteListed(), this.config.getMaximumConnections());
+        server.setHandshakeTimeout(this.config.getHandshakeTimeOut());
+        server.setFrameTimeoutTolerance(config.getFrameTimeOutTolerance());
+        server.setOriginCheck(this.config.getCheckOrigin());
+        server.setPingable(this.config.getIsPingable());
+        server.setMaximumFragmentationSize(this.config.getMaximumFragmentationSize());
         
         server.start();
 
@@ -72,7 +91,13 @@ public class WebSocketServicesBridge extends Plugin {
      */
     @Override
     public void onDisable() {
+        
         // save the configuration file, if there are no values, write the defaults.
+        server.Shutdown();
+        
+        // save the configuration file, if there are no values, write the defaults.
+        //this.config.saveConfig();
+        
     }
     
     /*

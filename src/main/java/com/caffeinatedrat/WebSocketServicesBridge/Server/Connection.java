@@ -52,6 +52,7 @@ public class Connection extends Thread {
     // ----------------------------------------------
     
     private Socket socket;
+    private IServiceLayer serviceLayer;
     private Server server;
     private String id;
     
@@ -70,13 +71,18 @@ public class Connection extends Thread {
     // Constructors
     // ----------------------------------------------
     
-    public Connection(Socket socket, com.caffeinatedrat.WebSocketServicesBridge.Server.Server server) {
+    public Connection(Socket socket, IServiceLayer serviceLayer, com.caffeinatedrat.WebSocketServicesBridge.Server.Server server) {
+        
+        if (serviceLayer == null) {
+            throw new IllegalArgumentException("The serviceLayer is invalid (null).");
+        }        
         
         if (server == null) {
             throw new IllegalArgumentException("The proxyServer is invalid (null).");
         }
         
         this.socket = socket;
+        this.serviceLayer = serviceLayer;
         this.server = server;
         
     }
@@ -84,7 +90,6 @@ public class Connection extends Thread {
     // ----------------------------------------------
     // Methods
     // ----------------------------------------------
-    
     
     /**
      * Begins managing an individual connection.
@@ -116,42 +121,57 @@ public class Connection extends Thread {
                             connections.add(new ProxyConnection(configuration, writerToClient, handshake));
                         }
                         
-                        final FullFrameReader readerFromClient = new FullFrameReader(this.socket, null, 15000, this.server.getMaximumFragmentationSize());
+                        final FullFrameReader readerFromClient = new FullFrameReader(this.socket, null, this.server.getFrameTimeoutTolerance(), this.server.getMaximumFragmentationSize());
                         
                         //Retrieve the number of open connections and loop until no connection is left open.
                         int openConnections = 0;
                         boolean initialConnection = true;
                         
+                        //By default the proxy did not handle the service.
+                        boolean serviceEvaluated = false;
+                        
                         do {
                             
                             //Read a single frame or all frames until fragmentation is done.
                             boolean hasRead = readerFromClient.read();
+                            final List<Frame> framesFromClient = readerFromClient.getFrames();
                             
-                            openConnections = 0;
-                            for(ProxyConnection connection : connections) {
-                                
-                                //During the initial connection, we spin up the threads.
-                                if(initialConnection) {
-                                    connection.start();
-                                }
-                                
-                                if(hasRead) {
-                                    List<Frame> framesFromClient = readerFromClient.getFrames();
-                                    connection.addFrames(framesFromClient);
-                                }
-                                
-                                if (!connection.isClosed()) {
-                                    openConnections++;
-                                }
+                            //Evaluate the proxy service handler once.
+                            if ( (serviceLayer != null) && (!initialConnection) ) {
+                                serviceEvaluated = serviceLayer.proxyServiceHandler(framesFromClient, writerToClient);
                             }
                             
-                            if (initialConnection) {
-                                initialConnection = false;
-                            }
+                            //Determine if the proxy has handled the service.
+                            if (!serviceEvaluated) {
                             
-                            readerFromClient.stopBlocking();
+                                openConnections = 0;
+                                for(ProxyConnection connection : connections) {
+                                    
+                                    //During the initial connection, we spin up the threads.
+                                    if(initialConnection) {
+                                        connection.start();
+                                    }
+                                    
+                                    if(hasRead) {
+                                        connection.addFrames(framesFromClient);
+                                    }
+                                    
+                                    if (!connection.isClosed()) {
+                                        openConnections++;
+                                    }
+                                }
+                                
+                                if (initialConnection) {
+                                    initialConnection = false;
+                                }
+                                
+                                readerFromClient.stopBlocking();
+                                
+                            }
+                            //END OF if (!serviceEvaluated) {...
                             
                         } while (openConnections > 0);
+
                     }
                     catch (Exception e) {
                         Logger.severe(e.getMessage());
@@ -204,5 +224,4 @@ public class Connection extends Thread {
             //Do nothing...
         }
     }
-    
 }

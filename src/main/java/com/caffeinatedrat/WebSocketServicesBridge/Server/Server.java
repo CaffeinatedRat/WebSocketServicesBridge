@@ -54,11 +54,14 @@ public class Server extends Thread {
     private int port;
     private int maximumThreads;
     private int handshakeTimeOutInMilliseconds;
+    private int frameTimeOutToleranceInMilliseconds;
     private int maximumFragmentationSize;
     private boolean checkOrigin;
     private boolean pingable;
     private HashSet<String> whitelist = null;
     private Set<ConfiguredServer> configuredServers = null;
+    
+    private IServiceLayer serviceLayer;
     
     //Keep track of all threads.
     private LinkedList<Connection> threads = null;
@@ -99,6 +102,22 @@ public class Server extends Thread {
      */
     public void setHandshakeTimeout(int timeout) {
         this.handshakeTimeOutInMilliseconds = timeout;
+    }
+    
+    /**
+     * Returns the amount of time in milliseconds that a connection will wait for a frame.
+     * @return The frame timeout in milliseconds.
+     */
+    public int getFrameTimeoutTolerance() {
+        return this.frameTimeOutToleranceInMilliseconds;
+    }
+    
+    /**
+     * Sets the amount of time in milliseconds that a connection will wait for a frame.
+     * @param timeout The frame timeout in milliseconds.
+     */
+    public void setFrameTimeoutTolerance(int timeout) {
+        this.frameTimeOutToleranceInMilliseconds = timeout;
     }
     
     /**
@@ -179,7 +198,7 @@ public class Server extends Thread {
     // Constructors
     // ----------------------------------------------
      
-    public Server(int port, Set<ConfiguredServer> configuredServers, boolean isWhiteListed, int maximumThreads) {
+    public Server(int port, IServiceLayer serviceLayer, Set<ConfiguredServer> configuredServers, boolean isWhiteListed, int maximumThreads) {
         
         if (configuredServers == null) {
             
@@ -195,8 +214,11 @@ public class Server extends Thread {
         this.configuredServers = configuredServers;
         this.maximumThreads = maximumThreads;
         this.handshakeTimeOutInMilliseconds = 1000;
+        this.frameTimeOutToleranceInMilliseconds = 3000;
+        this.maximumFragmentationSize = 2;
         this.checkOrigin = true;
         this.pingable = true;
+        this.serviceLayer = serviceLayer;
         
         if(isWhiteListed)
         {
@@ -253,7 +275,7 @@ public class Server extends Thread {
                 //NOTE: Minimal unit testing has been done here...more testing is required.
                 if ( (threads.size() + 1) <= this.getMaximumThreads()) {
                     
-                    Connection t = new Connection(socket, this);
+                    Connection t = new Connection(socket, this.serviceLayer, this);
                     t.start();
                     threads.add(t);
                     

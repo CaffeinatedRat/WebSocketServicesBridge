@@ -119,7 +119,7 @@ public class ProxyConnection extends Thread {
                     //Instantiate the reader outside of the loop so that we can prevent blocking.
                     FullFrameReader reader = null;
                     try {
-                        reader = new FullFrameReader(this.socket, null, 15000, this.configuredServer.getMaximumFragmentationSize());
+                        reader = new FullFrameReader(this.socket, null, this.configuredServer.getFrameTimeoutTolerance(), this.configuredServer.getMaximumFragmentationSize());
                     } catch (InvalidFrameException e) {
                         Logger.verboseDebug(MessageFormat.format("Unable to create a FullFrameReader: {0}", e.getMessage()));
                         return;
