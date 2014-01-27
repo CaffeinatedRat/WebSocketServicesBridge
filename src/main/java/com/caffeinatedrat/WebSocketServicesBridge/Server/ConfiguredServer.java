@@ -48,6 +48,8 @@ public class ConfiguredServer {
     private String hostAddress;
     private int port;
     private int maximumFragmentationSize;
+    private int handshakeTimeOutInMilliseconds;
+    private int frameTimeOutToleranceInMilliseconds;
     
     // ----------------------------------------------
     // Properties
@@ -78,11 +80,43 @@ public class ConfiguredServer {
     }
     
     /**
+     * Sets the handshake timeout in milliseconds.
+     * @param timeout The timeout handshake in milliseconds.
+     */
+    public void setHandshakeTimeout(int timeout) {
+        this.handshakeTimeOutInMilliseconds = timeout;
+    }
+    
+    /**
+     * Returns the amount of time in milliseconds that a connection will wait for a frame.
+     * @return The frame timeout in milliseconds.
+     */
+    public int getFrameTimeoutTolerance() {
+        return this.frameTimeOutToleranceInMilliseconds;
+    }
+    
+    /**
+     * Sets the amount of time in milliseconds that a connection will wait for a frame.
+     * @param timeout The frame timeout in milliseconds.
+     */
+    public void setFrameTimeoutTolerance(int timeout) {
+        this.frameTimeOutToleranceInMilliseconds = timeout;
+    }
+    
+    /**
      * Returns the maximum fragmentation size.
      * @return The maximum fragmentation size.
      */
     public int getMaximumFragmentationSize() {
         return this.maximumFragmentationSize;
+    }
+    
+    /**
+     * Sets the maximum fragmentation size.
+     * @param timeout The maximum fragmentation size.
+     */
+    public void setMaximumFragmentationSize(int maximumFragmentationSize) {
+        this.maximumFragmentationSize = maximumFragmentationSize;
     }
     
     // ----------------------------------------------
