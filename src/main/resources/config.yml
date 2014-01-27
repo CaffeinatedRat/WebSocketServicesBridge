@@ -1,23 +1,40 @@
-#Configuration for the websocket bridge.
+# ----------------------------------------------------------------------------
+# websocketservicesbridge: Configuration for the WebSocketServicesBridge.
+#   active: True if the WebSocketServicesBridge is running.
+#   portNumber: The port number your bridge will be running on.
+#   logging: Logs to the console (0 = off, 1 = simple, 2 = verbose).
+#   maximumConnections: Sets the maximum number of connections the server can handle concurrently.
+#   handshakeTimeOutTolerance: Sets the number of milliseconds that the server will wait for a handshake to complete.
+#   frameTimeOutTolerance: Sets the number of milliseconds that the server will wait for a frame to complete before terminating the connection.
+#   maximumFragmentationSize: Sets the maximum number of frames that can be sent in a single request to your server.  The higher this value is the more likely someone can reduce your servers performance if they flood you with large size requests.
+#   checkOrigin: Determines if the origin is valid during the handshake.  If the origin is null, it is invalid and the connection is rejected.
+#   whitelist: Determines if the websocket services are only available to certain ips.  Note that this checks the origin header field during the handshake and can be spoofed by non-browser clients.
+#   pingable: Determines if the server is pingable via websockets (This is reserved as a future feature as most browers do not support a websocket ping method).
+#   muteDisabledServices: Silences the response from all services and extensions that are disabled.
+# services: Configuration for service states, where the following states are supported:
+#   1) active - Where the service is overridden by the Bridge and returns with its own response.
+#   2) passive - Where the service is passed onto each WebSocketServices.
+#   WARNING: Service names are case sensitive.
+# websocketservers: A list of websocketservers to bridge.
+#   NameOfServer: The name (id) of your server and it cannot contain spaces.
+#     address:  This is the address of the WebSocketServer.  It must contain address & port (IE: localhost:25564). 
+#     restricted: Determines if the Bridge will communicate with this server.  If this is set to true the Bridge will NOT talk to this server.
+# ----------------------------------------------------------------------------
+
 websocketservicesbridge:
+  active: true
   portNumber: 25568
-  #Logs to the console (0 = off, 1 = simple, 2 = verbose).
   logging: 0
-  #Sets the maximum number of connections the server can handle concurrently.
   maximumConnections: 32
-  #Sets the number of milliseconds that the server will wait for a handshake to complete.
   handshakeTimeOutTolerance: 1000
-  #Sets the number of milliseconds that the server will wait for a frame to complete before terminating the connection.
-  frameTimeOutTolerance: 3000
-  #Sets the maximum number of frames that can be sent in a single request to your server.  The higher this value is the more likely someone can reduce your servers performance if they flood you with large size requests.
+  frameTimeOutTolerance: 5000
   maximumFragmentationSize: 2
-  #Determines if the origin is valid during the handshake.  If the origin is null, it is invalid and the connection is rejected.
   checkOrigin: true
-  #Determines if the websocket services are only available to certain ips.  Note that this checks the origin header field during the handshake and can be spoofed by non-browser clients.
   whitelist: false
-  #Determines if the server is pingable via websockets (This is reserved as a future feature as most browers do not support a websocket ping method).
   pingable: false
-#A list of websocketservers to bridge.
+  muteDisabledServices: false
+services:
+  whitelist: passive
 websocketservers:
   minecraft1:
     address: localhost:25564
